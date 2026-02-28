@@ -1,0 +1,12 @@
+[submodule "packages/forge-ao"]
+	path = packages/forge-ao
+	url = https://github.com/openclaw-collab/forge-ao.git
+[submodule "packages/agent-orchestrator"]
+	path = packages/agent-orchestrator
+	url = https://github.com/openclaw-collab/agent-orchestrator.git
+[submodule "packages/bmad-openclaw"]
+	path = packages/bmad-openclaw
+	url = https://github.com/openclaw-collab/BMAD_Openclaw.git
+[submodule "packages/desloppify"]
+	path = packages/desloppify
+	url = https://github.com/openclaw-collab/desloppify.git
