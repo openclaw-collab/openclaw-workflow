@@ -138,6 +138,9 @@ openclaw forge status forge-1234567890-abc
 # Spawn quality agent
 openclaw forge desloppify my-project --target 95
 
+# Run security gate (mandatory before review phase)
+openclaw forge security forge-1234567890-abc
+
 # Check overall workflow status
 openclaw status
 ```
@@ -220,7 +223,32 @@ openclaw forge run forge-1709123456789-abc123
 /forge:learn       # Pattern extraction
 ```
 
-### Phase 4: Quality Assurance (Desloppify)
+### Phase 4: Security Gate (Mandatory)
+
+```bash
+# Spawn security reviewer agent
+openclaw forge security <debate-id>
+
+# Or with strict mode (fail on high severity)
+openclaw forge security <debate-id> --strict
+
+# Security checks performed:
+# - Secret scanning (API keys, passwords, tokens)
+# - Injection vulnerabilities (SQL, XSS, command)
+# - Authentication issues (weak JWT, session fixation)
+# - Authorization issues (IDOR, missing access control)
+# - Dependency vulnerabilities (npm audit, CVEs)
+# - Configuration issues (debug mode, insecure CORS)
+```
+
+**Blocking Behavior:**
+- Critical issues → **BLOCKS** workflow advancement
+- High issues → Warning (blocks with `--strict`)
+- Medium/Low → Non-blocking, documented
+
+Security review output: `docs/forge/phases/security.md`
+
+### Phase 5: Quality Assurance (Desloppify)
 
 ```bash
 # Spawn autonomous quality agent
@@ -389,6 +417,13 @@ started_at: "2026-01-15T10:30:00Z"
 - **Trigger**: Build phase completion
 - **Action**: `openclaw forge desloppify <project>`
 - **Data**: Codebase → quality score → fixes
+
+### FORGE Security Gate
+
+- **Trigger**: Before review phase or workflow completion
+- **Action**: `openclaw forge security <debate-id>`
+- **Blocking**: Critical issues block advancement
+- **Output**: `docs/forge/phases/security.md`
 
 ## Advanced Usage
 
