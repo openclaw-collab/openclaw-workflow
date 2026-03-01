@@ -1,7 +1,7 @@
 #!/bin/bash
 # OpenClaw Unified CLI
 # Single entry point for all OpenClaw workflow tools
-# Commands are prefixed with workflow: to avoid conflicts with native tools
+# Usage: workflow <command> [options]
 
 OPENCLAW_DIR="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
 
@@ -14,22 +14,22 @@ NC='\033[0m'
 function show_help() {
     echo "OpenClaw Workflow - Unified CLI"
     echo ""
-    echo "Usage: workflow:<command> [options]"
+    echo "Usage: workflow <command> [options]"
     echo ""
     echo "Commands:"
-    echo "  workflow:init                    Initialize a new OpenClaw project"
-    echo "  workflow:prd                     Start BMAD PRD creation workflow"
-    echo "  workflow:ao <command>            Agent Orchestrator commands"
-    echo "  workflow:forge <command>         FORGE workflow commands"
-    echo "  workflow:desloppify <command>    Code quality commands"
-    echo "  workflow:status                  Show workflow status"
-    echo "  workflow:doctor                  Check installation health"
+    echo "  workflow init                    Initialize a new OpenClaw project"
+    echo "  workflow prd                     Start BMAD PRD creation workflow"
+    echo "  workflow ao <command>            Agent Orchestrator commands"
+    echo "  workflow forge <command>         FORGE workflow commands"
+    echo "  workflow desloppify <command>    Code quality commands"
+    echo "  workflow status                  Show workflow status"
+    echo "  workflow doctor                  Check installation health"
     echo ""
     echo "Examples:"
-    echo "  workflow:init                      # Initialize project"
-    echo "  workflow:prd                       # Create PRD"
-    echo "  workflow:ao init --auto            # Initialize AO"
-    echo "  workflow:forge init-from-prd ...   # Start FORGE"
+    echo "  workflow init                      # Initialize project"
+    echo "  workflow prd                       # Create PRD"
+    echo "  workflow ao init --auto            # Initialize AO"
+    echo "  workflow forge init-from-prd ...   # Start FORGE"
     echo ""
 }
 
@@ -84,15 +84,15 @@ EOL
     echo "✓ Project initialized"
     echo ""
     echo "Next:"
-    echo "  workflow:prd          # Create product requirements"
-    echo "  workflow:ao init      # Initialize orchestration"
+    echo "  workflow prd          # Create product requirements"
+    echo "  workflow ao init      # Initialize orchestration"
 }
 
 function cmd_prd() {
     echo "📋 BMAD PRD workflow..."
 
     if [ ! -f ".openclaw/config.yaml" ]; then
-        echo "⚠️  Run: workflow:init"
+        echo "⚠️  Run: workflow init"
         exit 1
     fi
 
@@ -183,14 +183,14 @@ function cmd_doctor() {
         ALL_GOOD=false
     fi
 
-    if [ -d "$OPENCLAW_DIR/packages/agent-orchestrator/.git" ]; then
+    if [ -e "$OPENCLAW_DIR/packages/agent-orchestrator/.git" ]; then
         echo -e "${GREEN}✓${NC} AO submodule"
     else
         echo -e "${RED}✗${NC} AO submodule missing"
         ALL_GOOD=false
     fi
 
-    if [ -d "$OPENCLAW_DIR/packages/forge-ao/.git" ]; then
+    if [ -e "$OPENCLAW_DIR/packages/forge-ao/.git" ]; then
         echo -e "${GREEN}✓${NC} FORGE submodule"
     else
         echo -e "${RED}✗${NC} FORGE submodule missing"

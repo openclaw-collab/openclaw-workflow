@@ -67,10 +67,10 @@ cd "$OPENCLAW_DIR"
 git submodule update --init --recursive --force
 echo -e "${GREEN}✓ All submodules initialized${NC}"
 
-# Verify all submodules exist
+# Verify all submodules exist (check for .git file/directory)
 SUBMODULES_MISSING=false
 for submodule in packages/agent-orchestrator packages/bmad-openclaw packages/forge-ao packages/desloppify; do
-    if [ ! -d "$OPENCLAW_DIR/$submodule/.git" ]; then
+    if [ ! -e "$OPENCLAW_DIR/$submodule/.git" ]; then
         echo -e "${RED}✗ Submodule missing: $submodule${NC}"
         SUBMODULES_MISSING=true
     fi
@@ -148,22 +148,22 @@ NC='\033[0m'
 function show_help() {
     echo "OpenClaw Workflow - Unified CLI"
     echo ""
-    echo "Usage: workflow:<command> [options]"
+    echo "Usage: workflow <command> [options]"
     echo ""
     echo "Commands:"
-    echo "  workflow:init                    Initialize a new OpenClaw project"
-    echo "  workflow:prd                     Start BMAD PRD creation workflow"
-    echo "  workflow:ao <command>            Agent Orchestrator commands"
-    echo "  workflow:forge <command>         FORGE workflow commands"
-    echo "  workflow:desloppify <command>    Code quality commands"
-    echo "  workflow:status                  Show workflow status"
-    echo "  workflow:doctor                  Check installation health"
+    echo "  workflow init                    Initialize a new OpenClaw project"
+    echo "  workflow prd                     Start BMAD PRD creation workflow"
+    echo "  workflow ao <command>            Agent Orchestrator commands"
+    echo "  workflow forge <command>         FORGE workflow commands"
+    echo "  workflow desloppify <command>    Code quality commands"
+    echo "  workflow status                  Show workflow status"
+    echo "  workflow doctor                  Check installation health"
     echo ""
     echo "Examples:"
-    echo "  workflow:init                      # Initialize project"
-    echo "  workflow:prd                       # Create PRD"
-    echo "  workflow:ao init --auto            # Initialize AO"
-    echo "  workflow:forge init-from-prd ...   # Start FORGE"
+    echo "  workflow init                      # Initialize project"
+    echo "  workflow prd                       # Create PRD"
+    echo "  workflow ao init --auto            # Initialize AO"
+    echo "  workflow forge init-from-prd ...   # Start FORGE"
     echo ""
 }
 
@@ -218,15 +218,15 @@ EOL
     echo "✓ Project initialized"
     echo ""
     echo "Next:"
-    echo "  workflow:prd          # Create product requirements"
-    echo "  workflow:ao init      # Initialize orchestration"
+    echo "  workflow prd          # Create product requirements"
+    echo "  workflow ao init      # Initialize orchestration"
 }
 
 function cmd_prd() {
     echo "📋 BMAD PRD workflow..."
 
     if [ ! -f ".openclaw/config.yaml" ]; then
-        echo "⚠️  Run: workflow:init"
+        echo "⚠️  Run: workflow init"
         exit 1
     fi
 
@@ -374,17 +374,13 @@ case "$CMD" in
 esac
 EOF
 
-chmod +x "$OPENCLAW_DIR/bin/openclaw"
+# Rename CLI to workflow
+mv "$OPENCLAW_DIR/bin/openclaw" "$OPENCLAW_DIR/bin/workflow" 2>/dev/null || true
+chmod +x "$OPENCLAW_DIR/bin/workflow"
 
-# Create workflow: prefixed symlinks
+# Create single 'workflow' command (usage: workflow doctor, workflow init, etc.)
 mkdir -p ~/.local/bin
-ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:init 2>/dev/null || true
-ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:prd 2>/dev/null || true
-ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:ao 2>/dev/null || true
-ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:forge 2>/dev/null || true
-ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:desloppify 2>/dev/null || true
-ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:status 2>/dev/null || true
-ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:doctor 2>/dev/null || true
+ln -sf "$OPENCLAW_DIR/bin/workflow" ~/.local/bin/workflow 2>/dev/null || true
 
 # Add to PATH if needed
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
@@ -396,7 +392,7 @@ if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     echo 'export PATH="$HOME/.local/bin:$PATH"'
 fi
 
-echo -e "${GREEN}✓ Unified CLI created at: $OPENCLAW_DIR/bin/openclaw${NC}"
+echo -e "${GREEN}✓ Unified CLI created at: $OPENCLAW_DIR/bin/workflow${NC}"
 
 echo ""
 echo -e "${GREEN}═══════════════════════════════════════════════════════════════${NC}"
@@ -405,15 +401,15 @@ echo -e "${GREEN}═════════════════════
 echo ""
 echo "Quick Start:"
 echo "  1. cd your-project"
-echo "  2. workflow:init       # Initialize OpenClaw workflow"
-echo "  3. workflow:prd        # Create product requirements"
-echo "  4. workflow:ao init    # Initialize orchestration"
-echo "  5. workflow:forge ...  # Start FORGE implementation"
+echo "  2. workflow init       # Initialize OpenClaw workflow"
+echo "  3. workflow prd        # Create product requirements"
+echo "  4. workflow ao init    # Initialize orchestration"
+echo "  5. workflow forge ...  # Start FORGE implementation"
 echo ""
 echo "Commands:"
-echo "  workflow:doctor        # Check installation health"
-echo "  workflow:status        # Show workflow status"
-echo "  workflow:init --help   # Show all commands"
+echo "  workflow doctor        # Check installation health"
+echo "  workflow status        # Show workflow status"
+echo "  workflow init --help   # Show all commands"
 echo ""
 
 if [ "$CLAUDE_INSTALLED" = false ]; then
