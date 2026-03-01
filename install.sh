@@ -61,14 +61,25 @@ fi
 
 echo ""
 
-# Initialize submodules if not already done
-if [ ! -f "$OPENCLAW_DIR/packages/forge-ao/.git" ]; then
-    echo -e "${BLUE}Initializing submodules...${NC}"
-    cd "$OPENCLAW_DIR"
-    git submodule update --init --recursive
-    echo -e "${GREEN}✓ Submodules initialized${NC}"
-else
-    echo -e "${GREEN}✓ Submodules already present${NC}"
+# Initialize all submodules by default
+echo -e "${BLUE}Initializing all submodules...${NC}"
+cd "$OPENCLAW_DIR"
+git submodule update --init --recursive --force
+echo -e "${GREEN}✓ All submodules initialized${NC}"
+
+# Verify all submodules exist
+SUBMODULES_MISSING=false
+for submodule in packages/agent-orchestrator packages/bmad-openclaw packages/forge-ao packages/desloppify; do
+    if [ ! -d "$OPENCLAW_DIR/$submodule/.git" ]; then
+        echo -e "${RED}✗ Submodule missing: $submodule${NC}"
+        SUBMODULES_MISSING=true
+    fi
+done
+
+if [ "$SUBMODULES_MISSING" = true ]; then
+    echo -e "${YELLOW}⚠ Some submodules are missing. Trying alternative initialization...${NC}"
+    git submodule init
+    git submodule update --recursive
 fi
 
 echo ""
@@ -124,49 +135,52 @@ cat > "$OPENCLAW_DIR/bin/openclaw" << 'EOF'
 #!/bin/bash
 # OpenClaw Unified CLI
 # Single entry point for all OpenClaw workflow tools
+# Commands are prefixed with workflow: to avoid conflicts with native tools
 
 OPENCLAW_DIR="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
 
 function show_help() {
     echo "OpenClaw Workflow - Unified CLI"
     echo ""
-    echo "Usage: openclaw <command> [options]"
+    echo "Usage: workflow:<command> [options]"
     echo ""
     echo "Commands:"
-    echo "  init                    Initialize a new OpenClaw project"
-    echo "  prd                     Start BMAD PRD creation workflow"
-    echo "  ao <command>            Agent Orchestrator commands"
-    echo "  forge <command>         FORGE workflow commands"
-    echo "  desloppify <command>    Code quality commands"
-    echo "  status                  Show workflow status"
-    echo "  doctor                  Check installation health"
+    echo "  workflow:init                    Initialize a new OpenClaw project"
+    echo "  workflow:prd                     Start BMAD PRD creation workflow"
+    echo "  workflow:ao <command>            Agent Orchestrator commands"
+    echo "  workflow:forge <command>         FORGE workflow commands"
+    echo "  workflow:desloppify <command>    Code quality commands"
+    echo "  workflow:status                  Show workflow status"
+    echo "  workflow:doctor                  Check installation health"
     echo ""
     echo "Examples:"
-    echo "  openclaw init                      # Initialize project"
-    echo "  openclaw prd                       # Create PRD"
-    echo "  openclaw ao init --auto            # Initialize AO"
-    echo "  openclaw forge init-from-prd ...   # Start FORGE"
+    echo "  workflow:init                      # Initialize project"
+    echo "  workflow:prd                       # Create PRD"
+    echo "  workflow:ao init --auto            # Initialize AO"
+    echo "  workflow:forge init-from-prd ...   # Start FORGE"
     echo ""
 }
 
 function cmd_init() {
     echo "🔧 Initializing OpenClaw project..."
 
-    # Check if already initialized
     if [ -f ".openclaw/config.yaml" ]; then
-        echo "⚠️  OpenClaw already initialized in this directory"
+        echo "⚠️  OpenClaw already initialized"
         exit 1
     fi
 
-    # Create project structure
     mkdir -p .openclaw
     mkdir -p docs/prd
     mkdir -p docs/forge
     mkdir -p src
 
-    # Create config
     cat > .openclaw/config.yaml << EOL
-# OpenClaw Workflow Configuration
 project:
   name: $(basename "$(pwd)")
   created: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -183,66 +197,45 @@ paths:
   src: src
 EOL
 
-    # Initialize git if not already
     if [ ! -d ".git" ]; then
         git init
         echo "✓ Git initialized"
     fi
 
-    # Create .gitignore
     cat > .gitignore << EOL
-# OpenClaw
 .openclaw/sessions/
 .claude/forge/snapshots/
 .desloppify/
-
-# Node
 node_modules/
 dist/
-
-# Python
 __pycache__/
 *.pyc
 .venv/
-
-# IDE
 .vscode/
 .idea/
 EOL
 
     echo "✓ Project initialized"
     echo ""
-    echo "Next steps:"
-    echo "  1. openclaw prd          # Create product requirements"
-    echo "  2. openclaw ao init      # Initialize orchestration"
+    echo "Next:"
+    echo "  workflow:prd          # Create product requirements"
+    echo "  workflow:ao init      # Initialize orchestration"
 }
 
 function cmd_prd() {
-    echo "📋 Starting BMAD PRD workflow..."
+    echo "📋 BMAD PRD workflow..."
 
     if [ ! -f ".openclaw/config.yaml" ]; then
-        echo "⚠️  Not an OpenClaw project. Run: openclaw init"
+        echo "⚠️  Run: workflow:init"
         exit 1
     fi
 
-    # Check if BMAD exists
     BMAD_DIR="$OPENCLAW_DIR/packages/bmad-openclaw"
-    if [ -d "$BMAD_DIR" ]; then
-        echo "BMAD workflow available at: $BMAD_DIR"
-        echo ""
-        echo "To create PRD:"
-        echo "  1. Start Claude Code: claude"
-        echo "  2. Load BMAD workflow: /load $BMAD_DIR/bmad-method/bmm/workflows/2-plan-workflows/create-prd/workflow-create-prd.md"
-        echo ""
-        echo "Or manually follow the workflow in:"
-        echo "  $BMAD_DIR/bmad-method/bmm/workflows/2-plan-workflows/create-prd/steps-c/"
-    else
-        echo "⚠️  BMAD not found. Run: openclaw doctor"
-    fi
+    echo "Load: $BMAD_DIR/bmad-method/bmm/workflows/2-plan-workflows/create-prd/workflow-create-prd.md"
 }
 
 function cmd_ao() {
-    shift  # Remove 'ao' from args
+    shift
     if command -v ao &> /dev/null; then
         ao "$@"
     elif [ -f "$OPENCLAW_DIR/packages/agent-orchestrator/bin/ao.js" ]; then
@@ -254,21 +247,14 @@ function cmd_ao() {
 }
 
 function cmd_forge() {
-    shift  # Remove 'forge' from args
-
+    shift
     if [ "$1" == "init-from-prd" ]; then
-        # Enhanced init-from-prd with auto-detection
         shift
         PRD_PATH="${1:-docs/prd.md}"
         PROJECT_ID="${2:-$(basename "$(pwd)")}"
-
         echo "🔥 FORGE: Creating debate from PRD..."
-        echo "  PRD: $PRD_PATH"
-        echo "  Project: $PROJECT_ID"
-
         cmd_ao ao forge init-from-prd "$PRD_PATH" "$PROJECT_ID"
     else
-        # Pass through to AO forge
         cmd_ao ao forge "$@"
     fi
 }
@@ -277,67 +263,46 @@ function cmd_desloppify() {
     if command -v desloppify &> /dev/null; then
         desloppify "$@"
     else
-        echo "⚠️  Desloppify not installed"
-        echo "Install with: pip install desloppify[full]"
+        echo "⚠️  pip install desloppify[full]"
         exit 1
     fi
 }
 
 function cmd_status() {
-    echo "📊 OpenClaw Workflow Status"
+    echo "📊 OpenClaw Status"
     echo ""
 
-    # Check project
     if [ -f ".openclaw/config.yaml" ]; then
-        echo -e "${GREEN}✓${NC} OpenClaw project initialized"
-        PROJECT_NAME=$(grep "name:" .openclaw/config.yaml | head -1 | cut -d':' -f2 | tr -d ' ')
-        echo "  Project: $PROJECT_NAME"
+        echo -e "${GREEN}✓${NC} Project initialized"
     else
-        echo -e "${YELLOW}⚠${NC} Not an OpenClaw project"
+        echo -e "${YELLOW}⚠${NC} Not initialized"
     fi
 
-    # Check PRD
     if [ -f "docs/prd.md" ]; then
         echo -e "${GREEN}✓${NC} PRD exists"
     else
-        echo -e "${YELLOW}⚠${NC} No PRD found"
+        echo -e "${YELLOW}⚠${NC} No PRD"
     fi
 
-    # Check AO
     if command -v ao &> /dev/null; then
-        echo -e "${GREEN}✓${NC} Agent Orchestrator installed"
-        # Try to get status
-        ao status 2>/dev/null || true
+        echo -e "${GREEN}✓${NC} AO installed"
     else
-        echo -e "${YELLOW}⚠${NC} Agent Orchestrator not available"
+        echo -e "${YELLOW}⚠${NC} AO not available"
     fi
 
-    # Check FORGE
     if [ -d ".claude/forge" ]; then
         echo -e "${GREEN}✓${NC} FORGE initialized"
-        if [ -f ".claude/forge/active-workflow.md" ]; then
-            PHASE=$(grep "^phase:" .claude/forge/active-workflow.md | cut -d':' -f2 | tr -d ' ')
-            echo "  Current phase: $PHASE"
-        fi
     else
         echo -e "${YELLOW}⚠${NC} FORGE not initialized"
-    fi
-
-    # Check desloppify
-    if command -v desloppify &> /dev/null; then
-        echo -e "${GREEN}✓${NC} Desloppify installed"
-    else
-        echo -e "${YELLOW}⚠${NC} Desloppify not available"
     fi
 }
 
 function cmd_doctor() {
-    echo "🏥 OpenClaw Workflow Health Check"
+    echo "🏥 OpenClaw Health Check"
     echo ""
 
     ALL_GOOD=true
 
-    # Check Node
     if command -v node &> /dev/null; then
         echo -e "${GREEN}✓${NC} Node.js $(node -v)"
     else
@@ -345,7 +310,6 @@ function cmd_doctor() {
         ALL_GOOD=false
     fi
 
-    # Check Python
     if command -v python3 &> /dev/null; then
         echo -e "${GREEN}✓${NC} Python $(python3 --version | cut -d' ' -f2)"
     else
@@ -353,25 +317,24 @@ function cmd_doctor() {
         ALL_GOOD=false
     fi
 
-    # Check submodules
     if [ -d "$OPENCLAW_DIR/packages/agent-orchestrator/.git" ]; then
-        echo -e "${GREEN}✓${NC} Agent Orchestrator submodule"
+        echo -e "${GREEN}✓${NC} AO submodule"
     else
-        echo -e "${RED}✗${NC} Agent Orchestrator submodule missing"
+        echo -e "${RED}✗${NC} AO submodule missing"
         ALL_GOOD=false
     fi
 
     if [ -d "$OPENCLAW_DIR/packages/forge-ao/.git" ]; then
-        echo -e "${GREEN}✓${NC} FORGE-AO submodule"
+        echo -e "${GREEN}✓${NC} FORGE submodule"
     else
-        echo -e "${RED}✗${NC} FORGE-AO submodule missing"
+        echo -e "${RED}✗${NC} FORGE submodule missing"
         ALL_GOOD=false
     fi
 
     if [ -d "$OPENCLAW_DIR/packages/bmad-openclaw/.git" ]; then
-        echo -e "${GREEN}✓${NC} BMAD Openclaw submodule"
+        echo -e "${GREEN}✓${NC} BMAD submodule"
     else
-        echo -e "${RED}✗${NC} BMAD Openclaw submodule missing"
+        echo -e "${RED}✗${NC} BMAD submodule missing"
         ALL_GOOD=false
     fi
 
@@ -386,49 +349,42 @@ function cmd_doctor() {
     if [ "$ALL_GOOD" = true ]; then
         echo -e "${GREEN}All checks passed!${NC}"
     else
-        echo -e "${YELLOW}Some issues found. Run: ./install.sh${NC}"
+        echo -e "${YELLOW}Some issues found${NC}"
     fi
 }
 
-# Main command dispatch
-case "${1:-}" in
-    init)
-        cmd_init "$@"
-        ;;
-    prd)
-        cmd_prd "$@"
-        ;;
-    ao)
-        cmd_ao "$@"
-        ;;
-    forge)
-        cmd_forge "$@"
-        ;;
-    desloppify)
-        shift
-        cmd_desloppify "$@"
-        ;;
-    status)
-        cmd_status
-        ;;
-    doctor)
-        cmd_doctor
-        ;;
-    help|--help|-h)
-        show_help
-        ;;
-    *)
-        show_help
-        exit 1
-        ;;
+# Parse workflow:command format
+CMD="${1:-}"
+
+# Handle both workflow:command and command formats for flexibility
+if [[ "$CMD" == workflow:* ]]; then
+    CMD="${CMD#workflow:}"
+fi
+
+case "$CMD" in
+    init) cmd_init "$@" ;;
+    prd) cmd_prd "$@" ;;
+    ao) cmd_ao "$@" ;;
+    forge) cmd_forge "$@" ;;
+    desloppify) shift; cmd_desloppify "$@" ;;
+    status) cmd_status ;;
+    doctor) cmd_doctor ;;
+    help|--help|-h) show_help ;;
+    *) show_help; exit 1 ;;
 esac
 EOF
 
 chmod +x "$OPENCLAW_DIR/bin/openclaw"
 
-# Link to global bin
+# Create workflow: prefixed symlinks
 mkdir -p ~/.local/bin
-ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/openclaw 2>/dev/null || true
+ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:init 2>/dev/null || true
+ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:prd 2>/dev/null || true
+ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:ao 2>/dev/null || true
+ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:forge 2>/dev/null || true
+ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:desloppify 2>/dev/null || true
+ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:status 2>/dev/null || true
+ln -sf "$OPENCLAW_DIR/bin/openclaw" ~/.local/bin/workflow:doctor 2>/dev/null || true
 
 # Add to PATH if needed
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
@@ -449,15 +405,15 @@ echo -e "${GREEN}═════════════════════
 echo ""
 echo "Quick Start:"
 echo "  1. cd your-project"
-echo "  2. openclaw init       # Initialize OpenClaw workflow"
-echo "  3. openclaw prd        # Create product requirements"
-echo "  4. openclaw ao init    # Initialize orchestration"
-echo "  5. openclaw forge ...  # Start FORGE implementation"
+echo "  2. workflow:init       # Initialize OpenClaw workflow"
+echo "  3. workflow:prd        # Create product requirements"
+echo "  4. workflow:ao init    # Initialize orchestration"
+echo "  5. workflow:forge ...  # Start FORGE implementation"
 echo ""
 echo "Commands:"
-echo "  openclaw doctor        # Check installation health"
-echo "  openclaw status        # Show workflow status"
-echo "  openclaw --help        # Show all commands"
+echo "  workflow:doctor        # Check installation health"
+echo "  workflow:status        # Show workflow status"
+echo "  workflow:init --help   # Show all commands"
 echo ""
 
 if [ "$CLAUDE_INSTALLED" = false ]; then

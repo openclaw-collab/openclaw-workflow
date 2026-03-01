@@ -41,7 +41,7 @@ cd openclaw-workflow
 ./install.sh
 
 # Verify installation
-openclaw doctor
+workflow:doctor
 ```
 
 ### Start a New Project
@@ -51,20 +51,20 @@ openclaw doctor
 mkdir my-project && cd my-project
 
 # Initialize OpenClaw workflow
-openclaw init
+workflow:init
 
 # Create Product Requirements Document
-openclaw prd
+workflow:prd
 # ... follow the BMAD agent dialogue ...
 
 # Initialize orchestration
-openclaw ao init --auto
+workflow:ao init --auto
 
 # Create FORGE debate from PRD
-openclaw forge init-from-prd docs/prd.md my-project
+workflow:forge init-from-prd docs/prd.md my-project
 
 # Start implementation
-openclaw forge run <debate-id>
+workflow:forge run <debate-id>
 ```
 
 ## Architecture
@@ -96,53 +96,53 @@ Each submodule points to the official `openclaw-collab` repository and can be up
 
 ## Unified CLI
 
-The `openclaw` command provides a single entry point for all workflow operations:
+The `workflow:` prefix provides namespaced commands to avoid conflicts with native tools:
 
 ```
-openclaw <command> [options]
+workflow:<command> [options]
 
 Commands:
-  init                    Initialize a new OpenClaw project
-  prd                     Start BMAD PRD creation workflow
-  ao <command>            Agent Orchestrator commands
-  forge <command>         FORGE workflow commands
-  desloppify <command>    Code quality commands
-  status                  Show workflow status
-  doctor                  Check installation health
+  workflow:init                    Initialize a new OpenClaw project
+  workflow:prd                     Start BMAD PRD creation workflow
+  workflow:ao <command>            Agent Orchestrator commands
+  workflow:forge <command>         FORGE workflow commands
+  workflow:desloppify <command>    Code quality commands
+  workflow:status                  Show workflow status
+  workflow:doctor                  Check installation health
 ```
 
 ### Examples
 
 ```bash
 # Initialize workflow in current directory
-openclaw init
+workflow:init
 
 # Create PRD through BMAD dialogue
-openclaw prd
+workflow:prd
 
 # Initialize AO project
-openclaw ao init --auto
+workflow:ao init --auto
 
 # Spawn an agent for issue #123
-openclaw ao spawn my-project 123
+workflow:ao spawn my-project 123
 
 # Create FORGE debate from PRD
-openclaw forge init-from-prd docs/prd.md my-project
+workflow:forge init-from-prd docs/prd.md my-project
 
 # Start debate (spawns advocate, skeptic, operator, synthesizer)
-openclaw forge run forge-1234567890-abc
+workflow:forge run forge-1234567890-abc
 
 # Check debate status
-openclaw forge status forge-1234567890-abc
+workflow:forge status forge-1234567890-abc
 
 # Spawn quality agent
-openclaw forge desloppify my-project --target 95
+workflow:forge desloppify my-project --target 95
 
 # Run security gate (mandatory before review phase)
-openclaw forge security forge-1234567890-abc
+workflow:forge security forge-1234567890-abc
 
 # Check overall workflow status
-openclaw status
+workflow:status
 ```
 
 ## Complete Workflow Tutorial
@@ -152,10 +152,10 @@ openclaw status
 ```bash
 # Initialize project
 mkdir task-app && cd task-app
-openclaw init
+workflow:init
 
 # Start PRD creation
-openclaw prd
+workflow:prd
 ```
 
 The BMAD PM agent guides you through a structured 12-step dialogue:
@@ -178,7 +178,7 @@ Output: `docs/prd.md` with YAML frontmatter and comprehensive requirements.
 
 ```bash
 # Initialize AO project
-openclaw ao init --auto
+workflow:ao init --auto
 
 # This creates agent-orchestrator.yaml with:
 # - Project configuration
@@ -190,12 +190,12 @@ openclaw ao init --auto
 
 ```bash
 # Create debate from PRD
-openclaw forge init-from-prd docs/prd.md task-app
+workflow:forge init-from-prd docs/prd.md task-app
 
 # Output: Created debate forge-1709123456789-abc123
 
 # Run debate (spawns all role sessions)
-openclaw forge run forge-1709123456789-abc123
+workflow:forge run forge-1709123456789-abc123
 ```
 
 **What happens:**
@@ -227,10 +227,10 @@ openclaw forge run forge-1709123456789-abc123
 
 ```bash
 # Spawn security reviewer agent
-openclaw forge security <debate-id>
+workflow:forge security <debate-id>
 
 # Or with strict mode (fail on high severity)
-openclaw forge security <debate-id> --strict
+workflow:forge security <debate-id> --strict
 
 # Security checks performed:
 # - Secret scanning (API keys, passwords, tokens)
@@ -252,7 +252,7 @@ Security review output: `docs/forge/phases/security.md`
 
 ```bash
 # Spawn autonomous quality agent
-openclaw forge desloppify task-app --target 95
+workflow:forge desloppify task-app --target 95
 
 # Agent continuously improves code:
 # - Runs desloppify scan
@@ -392,7 +392,7 @@ started_at: "2026-01-15T10:30:00Z"
 ### BMAD → AO
 
 - **Trigger**: BMAD step-12 completion
-- **Action**: `openclaw forge init-from-prd docs/prd.md <project>`
+- **Action**: `workflow:forge init-from-prd docs/prd.md <project>`
 - **Data**: PRD frontmatter + content → debate plan
 
 ### AO → FORGE
@@ -415,13 +415,13 @@ started_at: "2026-01-15T10:30:00Z"
 ### FORGE → Desloppify
 
 - **Trigger**: Build phase completion
-- **Action**: `openclaw forge desloppify <project>`
+- **Action**: `workflow:forge desloppify <project>`
 - **Data**: Codebase → quality score → fixes
 
 ### FORGE Security Gate
 
 - **Trigger**: Before review phase or workflow completion
-- **Action**: `openclaw forge security <debate-id>`
+- **Action**: `workflow:forge security <debate-id>`
 - **Blocking**: Critical issues block advancement
 - **Output**: `docs/forge/phases/security.md`
 
@@ -464,18 +464,18 @@ maxRounds: 2
 
 Run it:
 ```bash
-openclaw forge init debate-plan.yaml my-project
-openclaw forge run <debate-id>
+workflow:forge init debate-plan.yaml my-project
+workflow:forge run <debate-id>
 ```
 
 ### Continuous Quality
 
 ```bash
 # Background quality agent
-openclaw forge desloppify my-project --target 95 --continuous
+workflow:forge desloppify my-project --target 95 --continuous
 
 # Check status anytime
-openclaw status
+workflow:status
 # Shows: strict_score, T1/T2/T3/T4 counts, open issues
 ```
 
@@ -501,11 +501,11 @@ jobs:
       - name: Setup OpenClaw
         run: |
           ./install.sh
-          openclaw ao init --auto
+          workflow:ao init --auto
 
       - name: Spawn implementation agent
         run: |
-          openclaw ao spawn my-project ${{ github.event.issue.number }}
+          workflow:ao spawn my-project ${{ github.event.issue.number }}
 ```
 
 ## Troubleshooting
@@ -514,7 +514,7 @@ jobs:
 
 ```bash
 # Verify all components
-openclaw doctor
+workflow:doctor
 
 # Update submodules
 git submodule update --remote
@@ -527,20 +527,20 @@ git submodule update --remote
 
 ```bash
 # Check AO status
-openclaw ao status
+workflow:ao status
 
 # View session logs
-openclaw ao session logs <session-id>
+workflow:ao session logs <session-id>
 
 # Kill stuck session
-openclaw ao session kill <session-id>
+workflow:ao session kill <session-id>
 ```
 
 ### FORGE State Issues
 
 ```bash
 # Check FORGE status
-openclaw status
+workflow:status
 
 # View active workflow
 cat .claude/forge/active-workflow.md

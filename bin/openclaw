@@ -1,6 +1,7 @@
 #!/bin/bash
 # OpenClaw Unified CLI
 # Single entry point for all OpenClaw workflow tools
+# Commands are prefixed with workflow: to avoid conflicts with native tools
 
 OPENCLAW_DIR="$(cd "$(dirname "$(dirname "${BASH_SOURCE[0]}")")" && pwd)"
 
@@ -13,22 +14,22 @@ NC='\033[0m'
 function show_help() {
     echo "OpenClaw Workflow - Unified CLI"
     echo ""
-    echo "Usage: openclaw <command> [options]"
+    echo "Usage: workflow:<command> [options]"
     echo ""
     echo "Commands:"
-    echo "  init                    Initialize a new OpenClaw project"
-    echo "  prd                     Start BMAD PRD creation workflow"
-    echo "  ao <command>            Agent Orchestrator commands"
-    echo "  forge <command>         FORGE workflow commands"
-    echo "  desloppify <command>    Code quality commands"
-    echo "  status                  Show workflow status"
-    echo "  doctor                  Check installation health"
+    echo "  workflow:init                    Initialize a new OpenClaw project"
+    echo "  workflow:prd                     Start BMAD PRD creation workflow"
+    echo "  workflow:ao <command>            Agent Orchestrator commands"
+    echo "  workflow:forge <command>         FORGE workflow commands"
+    echo "  workflow:desloppify <command>    Code quality commands"
+    echo "  workflow:status                  Show workflow status"
+    echo "  workflow:doctor                  Check installation health"
     echo ""
     echo "Examples:"
-    echo "  openclaw init                      # Initialize project"
-    echo "  openclaw prd                       # Create PRD"
-    echo "  openclaw ao init --auto            # Initialize AO"
-    echo "  openclaw forge init-from-prd ...   # Start FORGE"
+    echo "  workflow:init                      # Initialize project"
+    echo "  workflow:prd                       # Create PRD"
+    echo "  workflow:ao init --auto            # Initialize AO"
+    echo "  workflow:forge init-from-prd ...   # Start FORGE"
     echo ""
 }
 
@@ -83,15 +84,15 @@ EOL
     echo "✓ Project initialized"
     echo ""
     echo "Next:"
-    echo "  openclaw prd          # Create product requirements"
-    echo "  openclaw ao init      # Initialize orchestration"
+    echo "  workflow:prd          # Create product requirements"
+    echo "  workflow:ao init      # Initialize orchestration"
 }
 
 function cmd_prd() {
     echo "📋 BMAD PRD workflow..."
 
     if [ ! -f ".openclaw/config.yaml" ]; then
-        echo "⚠️  Run: openclaw init"
+        echo "⚠️  Run: workflow:init"
         exit 1
     fi
 
@@ -204,7 +205,16 @@ function cmd_doctor() {
     fi
 }
 
-case "${1:-}" in
+# Parse workflow:command format
+CMD="${1:-}"
+
+# Handle both workflow:command and command formats for flexibility
+if [[ "$CMD" == workflow:* ]]; then
+    # Extract command after workflow:
+    CMD="${CMD#workflow:}"
+fi
+
+case "$CMD" in
     init) cmd_init "$@" ;;
     prd) cmd_prd "$@" ;;
     ao) cmd_ao "$@" ;;
