@@ -1,0 +1,10 @@
+{
+  "name": "@openclaw/cli",
+  "version": "2.0.0",
+  "description": "OpenClaw Workflow Unified CLI",
+  "main": "dist/index.js",
+  "bin": { "openclaw": "dist/index.js" },
+  "scripts": { "build": "tsc", "dev": "tsx src/index.ts" },
+  "dependencies": { "yaml": "^2.7.0", "commander": "^13.0.0" },
+  "devDependencies": { "typescript": "^5.7.0", "@types/node": "^22.0.0", "tsx": "^4.19.0" }
+}
