@@ -66,6 +66,60 @@ python3 --version  # 3.11+
 git --version
 ```
 
+### CRITICAL: Claude Code First-Run Setup
+
+**For OpenClaw Agents/Automation:** Claude Code prompts for theme selection on first run, which blocks automated workflows. You must pre-configure Claude Code before AO can spawn sessions.
+
+**Option 1: Interactive Setup (Recommended for first install)**
+```bash
+# Install Claude Code globally
+npm install -g @anthropic-ai/claude-code
+
+# Run once to select theme (Dark/Light), then exit
+claude
+# Select theme with arrow keys, press Enter
+# Exit with Ctrl+D or type 'exit'
+
+# Now automation will work
+```
+
+**Option 2: Automated Setup (For VPS/Agents without TTY)**
+```bash
+# Install Claude Code
+npm install -g @anthropic-ai/claude-code
+
+# Create expect script to automate theme selection
+cat > /tmp/setup-claude.sh << 'EOF'
+#!/usr/bin/env expect -f
+spawn claude
+expect "Choose your theme"
+send "\r"  # Select default (Dark)
+expect {
+  "Claude Code" { send "\004" }  ;# Exit with Ctrl+D
+  timeout { send "\004" }
+}
+EOF
+chmod +x /tmp/setup-claude.sh
+
+# Run expect script (install expect first: apt-get install expect)
+/tmp/setup-claude.sh || true
+
+# Alternative: Use tmux to send keystrokes
+tmux new-session -d -s claude-setup "claude"
+sleep 2
+tmux send-keys -t claude-setup Enter  # Select theme
+tmux send-keys -t claude-setup C-d    # Exit
+```
+
+**Option 3: Docker with Pre-configured Claude Code**
+```dockerfile
+# Use image with Claude Code already initialized
+FROM openclaw/claude-code-base:latest
+
+# Claude settings are pre-configured in the image
+# Theme is already selected, API key can be passed at runtime
+```
+
 ### One-Command Installation
 
 ```bash
@@ -138,6 +192,153 @@ RUN export PATH="$HOME/.local/bin:$PATH" && ./install.sh
 ENV PATH="/home/openclaw/.local/bin:/home/openclaw/.nvm/versions/node/v22.0.0/bin:$PATH"
 
 ENTRYPOINT ["workflow"]
+```
+
+## OpenClaw Agent Usage
+
+If you're using OpenClaw (the AI agent platform) to run this workflow, follow these specific instructions:
+
+### Pre-flight Checklist for OpenClaw Agents
+
+Before invoking OpenClaw Workflow, ensure:
+
+1. **Non-root user is active** (Claude Code requirement)
+2. **Claude Code theme is pre-selected** (blocks automation otherwise)
+3. **API keys are configured** (Claude/OpenAI/etc.)
+
+### OpenClaw-Optimized Setup Script
+
+```bash
+#!/bin/bash
+# openclaw-agent-setup.sh - Run this first in your OpenClaw agent
+
+set -e
+
+# 1. Create and switch to non-root user (if running as root)
+if [ "$(whoami)" = "root" ]; then
+  useradd -m -s /bin/bash openclaw 2>/dev/null || true
+  # Run remaining setup as openclaw user
+  su - openclaw -c "bash $0"
+  exit 0
+fi
+
+# 2. Install Node.js via nvm (non-root)
+if ! command -v node &> /dev/null; then
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+  nvm install 22
+fi
+
+# 3. Install Python
+sudo apt-get update && sudo apt-get install -y python3.11 python3-pip git expect
+
+# 4. Install and pre-configure Claude Code
+if ! command -v claude &> /dev/null; then
+  npm install -g @anthropic-ai/claude-code
+
+  # Pre-select theme using expect
+  cat > /tmp/claude-setup.exp << 'EOF'
+spawn claude
+expect "Choose your theme"
+send "\r"
+expect eof
+EOF
+  expect /tmp/claude-setup.exp || true
+fi
+
+# 5. Clone and install OpenClaw Workflow
+if [ ! -d "openclaw-workflow" ]; then
+  git clone --recursive https://github.com/openclaw-collab/openclaw-workflow.git
+fi
+cd openclaw-workflow
+./install.sh --non-interactive
+
+# 6. Verify
+echo "Verification:"
+workflow doctor --json
+
+echo "Setup complete!"
+```
+
+### Using OpenClaw Workflow from OpenClaw
+
+**Method 1: Direct Shell Commands**
+```javascript
+// In your OpenClaw agent code
+const result = await execTool({
+  command: "cd ~/openclaw-workflow && workflow init my-project --json -y"
+});
+```
+
+**Method 2: Via OpenClaw's Exec Tool**
+```yaml
+# OpenClaw agent configuration
+actions:
+  - name: "Initialize OpenClaw Workflow"
+    tool: "Bash"
+    command: |
+      export PATH="$HOME/.local/bin:$PATH"
+      workflow init ${{ project_name }} --json --non-interactive
+
+  - name: "Create PRD"
+    tool: "Bash"
+    command: |
+      export OPENCLAW_PRD_CONTENT="${{ prd_content }}"
+      workflow prd --json --non-interactive
+
+  - name: "Spawn Implementation Agent"
+    tool: "Bash"
+    command: |
+      workflow ao spawn ${{ project_name }} ${{ issue_id }}
+```
+
+**Method 3: AO Spawn with Claude Code (Pre-configured)**
+```bash
+# The AO spawn command will use Claude Code
+# Claude Code must be pre-configured (theme selected, API key set)
+workflow ao init --auto
+workflow ao spawn my-project 123
+```
+
+### OpenClaw-Specific Environment Variables
+
+```bash
+# Required for non-interactive operation
+export OPENCLAW_PRD_CONTENT="Your PRD content here"
+export ANTHROPIC_API_KEY="sk-ant-..."
+
+# Optional
+export OPENCLAW_JSON_OUTPUT=true
+export OPENCLAW_NON_INTERACTIVE=true
+```
+
+### Troubleshooting OpenClaw Integration
+
+**Issue: "Claude Code cannot run as root"**
+```bash
+# OpenClaw may run as root by default
+# Create and switch to user:
+useradd -m -s /bin/bash openclaw
+su - openclaw
+```
+
+**Issue: AO spawn hangs indefinitely**
+```bash
+# Likely Claude Code theme selection blocking
+# Check if theme is configured:
+claude --version  # Should not show theme prompt
+
+# If stuck, pre-configure:
+expect -c 'spawn claude; expect "Choose your theme"; send "\r"; expect eof' || true
+```
+
+**Issue: "command not found: workflow"**
+```bash
+# Add to PATH in OpenClaw environment
+export PATH="$HOME/.local/bin:$PATH"
+# Or use full path:
+~/openclaw-workflow/bin/workflow ...
 ```
 
 ### Start a New Project
@@ -677,6 +878,115 @@ su - openclaw -c "cd ~ && git clone --recursive https://github.com/openclaw-coll
 su - openclaw -c "cd ~/openclaw-workflow && ./install.sh"
 
 echo "Setup complete. Switch to openclaw user: su - openclaw"
+```
+
+### Critical: Claude Code Theme Selection Blocks Automation
+
+**Problem:** AO spawns a session but Claude Code gets stuck on theme selection:
+```
+Choose your theme
+> Dark
+  Light
+```
+
+**Root Cause:** Claude Code requires interactive theme selection on first run. AO can't automate this.
+
+**Solution 1: Pre-configure Claude Code (Recommended)**
+```bash
+# Before running AO, manually configure Claude Code once
+npm install -g @anthropic-ai/claude-code
+claude
+# Select theme (Dark/Light), then exit with Ctrl+D
+
+# Now AO can spawn sessions without blocking
+workflow ao spawn my-project 123
+```
+
+**Solution 2: Use `expect` for Automated Setup**
+```bash
+# Install expect
+sudo apt-get install -y expect  # Ubuntu/Debian
+# or: brew install expect        # macOS
+
+# Create automation script
+cat > /tmp/claude-first-run.exp << 'EXPECT_EOF'
+#!/usr/bin/expect -f
+set timeout 10
+spawn claude
+expect "Choose your theme"
+send "\r"  # Accept default (Dark)
+expect {
+  -re " Claude Code .*" {
+    send "\004"  ;# Ctrl+D to exit
+  }
+  timeout {
+    send "\004"  ;# Exit anyway
+  }
+}
+EXPECT_EOF
+chmod +x /tmp/claude-first-run.exp
+/tmp/claude-first-run.exp
+```
+
+**Solution 3: Use tmux for Keystroke Injection**
+```bash
+# Start claude in detached tmux session
+tmux new-session -d -s claude-setup "claude"
+
+# Wait for theme prompt
+sleep 3
+
+# Send Enter to select default theme
+tmux send-keys -t claude-setup Enter
+
+# Wait for Claude to start
+sleep 2
+
+# Exit
+tmux send-keys -t claude-setup C-d
+
+# Kill tmux session
+tmux kill-session -t claude-setup
+```
+
+**Solution 4: Docker with Pre-configured Settings**
+```dockerfile
+FROM node:22-bookworm
+
+RUN apt-get update && apt-get install -y expect git python3.11
+
+# Create user
+RUN useradd -m -s /bin/bash openclaw
+USER openclaw
+WORKDIR /home/openclaw
+
+# Install nvm and Node.js
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+ENV NVM_DIR=/home/openclaw/.nvm
+RUN bash -c "source $NVM_DIR/nvm.sh && nvm install 22"
+
+# Install Claude Code
+RUN bash -c "source $NVM_DIR/nvm.sh && npm install -g @anthropic-ai/claude-code"
+
+# Pre-configure with expect
+RUN bash -c "source $NVM_DIR/nvm.sh && cat > /tmp/setup.exp << 'EOF'
+spawn claude
+expect \"Choose your theme\"
+send \"\\r\"
+expect eof
+EOF
+expect /tmp/setup.exp" || true
+
+# Now Claude Code is ready for AO
+```
+
+**Verification:**
+```bash
+# Test if Claude Code is configured
+claude --version  # Should show version without theme prompt
+
+# Test spawning via AO
+workflow ao spawn my-project test-issue
 ```
 
 ### Installation Issues
