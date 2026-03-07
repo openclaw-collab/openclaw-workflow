@@ -30,18 +30,114 @@ OpenClaw Workflow is a **meta-framework** that combines four specialized AI-nati
 
 ## Quick Start
 
+### Prerequisites
+
+**IMPORTANT: OpenClaw Workflow must be installed and run as a non-root user.** Claude Code (which FORGE uses) refuses to run as root for security reasons.
+
+```bash
+# Check if you're running as root (should return empty or non-zero)
+whoami  # should NOT be 'root'
+
+# If you are root, create a user first:
+# Ubuntu/Debian
+useradd -m -s /bin/bash openclaw
+usermod -aG sudo openclaw
+su - openclaw
+
+# Or use your existing user
+```
+
+**Required:**
+- Node.js 20+ (non-root installation recommended via nvm)
+- Python 3.11+
+- Git
+- pnpm (will be auto-installed if missing)
+
+```bash
+# Install Node.js via nvm (recommended - non-root)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+source ~/.bashrc  # or ~/.zshrc
+nvm install 22
+nvm use 22
+
+# Verify versions
+node -v  # v22.x.x
+python3 --version  # 3.11+
+git --version
+```
+
 ### One-Command Installation
 
 ```bash
-# Clone with all submodules
+# Clone with all submodules (as non-root user)
 git clone --recursive https://github.com/openclaw-collab/openclaw-workflow.git
 cd openclaw-workflow
 
 # Install everything
 ./install.sh
 
+# Add to PATH if needed (add this to ~/.bashrc or ~/.zshrc)
+export PATH="$HOME/.local/bin:$PATH"
+
 # Verify installation
-workflow:doctor
+workflow doctor
+```
+
+### Agent/VPS Deployment (Non-Interactive Mode)
+
+For automated/agent deployments where no human is present:
+
+```bash
+# 1. Set up non-root user first (CRITICAL)
+useradd -m -s /bin/bash openclaw
+su - openclaw
+
+# 2. Install with nvm (non-root Node.js)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+source ~/.bashrc
+nvm install 22
+
+# 3. Clone and install
+git clone --recursive https://github.com/openclaw-collab/openclaw-workflow.git
+cd openclaw-workflow
+./install.sh --non-interactive
+
+# 4. Full automated workflow
+export OPENCLAW_PRD_CONTENT="Build a React todo app with local storage"
+
+workflow init todo-app --json -y
+cd todo-app
+workflow prd --json --non-interactive
+workflow ao init --auto
+workflow forge init-from-prd docs/prd.md todo-app --json
+```
+
+**Docker Deployment (Recommended for VPS):**
+
+```dockerfile
+FROM node:22-bookworm
+
+# Install Python and git
+RUN apt-get update && apt-get install -y python3.11 python3-pip git
+
+# Create non-root user
+RUN useradd -m -s /bin/bash openclaw
+USER openclaw
+WORKDIR /home/openclaw
+
+# Install nvm and Node.js
+RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash
+ENV NVM_DIR=/home/openclaw/.nvm
+RUN . "$NVM_DIR/nvm.sh" && nvm install 22
+
+# Clone and setup
+RUN git clone --recursive https://github.com/openclaw-collab/openclaw-workflow.git
+WORKDIR /home/openclaw/openclaw-workflow
+RUN export PATH="$HOME/.local/bin:$PATH" && ./install.sh
+
+ENV PATH="/home/openclaw/.local/bin:/home/openclaw/.nvm/versions/node/v22.0.0/bin:$PATH"
+
+ENTRYPOINT ["workflow"]
 ```
 
 ### Start a New Project
@@ -51,20 +147,26 @@ workflow:doctor
 mkdir my-project && cd my-project
 
 # Initialize OpenClaw workflow
-workflow:init
+workflow init
 
 # Create Product Requirements Document
-workflow:prd
+workflow prd
 # ... follow the BMAD agent dialogue ...
 
 # Initialize orchestration
-workflow:ao init --auto
+workflow ao init --auto
 
 # Create FORGE debate from PRD
-workflow:forge init-from-prd docs/prd.md my-project
+workflow forge init-from-prd docs/prd.md my-project
 
 # Start implementation
-workflow:forge run <debate-id>
+workflow forge run <debate-id>
+```
+
+**Alternative syntax (both work):**
+```bash
+workflow:init my-project    # Colon syntax
+workflow init my-project    # Space syntax (standard)
 ```
 
 ## Architecture
@@ -96,53 +198,65 @@ Each submodule points to the official `openclaw-collab` repository and can be up
 
 ## Unified CLI
 
-The `workflow:` prefix provides namespaced commands to avoid conflicts with native tools:
+The `workflow` command provides a unified interface to all OpenClaw tools:
 
 ```
-workflow:<command> [options]
+workflow <command> [options]
 
 Commands:
-  workflow:init                    Initialize a new OpenClaw project
-  workflow:prd                     Start BMAD PRD creation workflow
-  workflow:ao <command>            Agent Orchestrator commands
-  workflow:forge <command>         FORGE workflow commands
-  workflow:desloppify <command>    Code quality commands
-  workflow:status                  Show workflow status
-  workflow:doctor                  Check installation health
+  init [name]              Initialize a new OpenClaw project
+  prd [content...]         Create PRD (uses OPENCLAW_PRD_CONTENT env var)
+  ao <command>             Agent Orchestrator commands
+  forge <command>          FORGE workflow commands
+  desloppify [args]        Code quality commands
+  status                   Show workflow status
+  doctor                   Check installation health
+
+Options:
+  --json                   Output JSON (for agents)
+  -y, --non-interactive    No prompts (VPS/agent mode)
+  -v, --verbose            Verbose output
+  -p, --project <name>     Project name
+```
+
+**Environment Variables for Agent Mode:**
+```bash
+export OPENCLAW_PRD_CONTENT="Build a task management app with..."
+workflow prd --json --non-interactive
 ```
 
 ### Examples
 
 ```bash
 # Initialize workflow in current directory
-workflow:init
+workflow init
 
 # Create PRD through BMAD dialogue
-workflow:prd
+workflow prd
 
 # Initialize AO project
-workflow:ao init --auto
+workflow ao init --auto
 
 # Spawn an agent for issue #123
-workflow:ao spawn my-project 123
+workflow ao spawn my-project 123
 
 # Create FORGE debate from PRD
-workflow:forge init-from-prd docs/prd.md my-project
+workflow forge init-from-prd docs/prd.md my-project
 
 # Start debate (spawns advocate, skeptic, operator, synthesizer)
-workflow:forge run forge-1234567890-abc
+workflow forge run forge-1234567890-abc
 
 # Check debate status
-workflow:forge status forge-1234567890-abc
+workflow forge status forge-1234567890-abc
 
 # Spawn quality agent
-workflow:forge desloppify my-project --target 95
+workflow forge desloppify my-project --target 95
 
 # Run security gate (mandatory before review phase)
-workflow:forge security forge-1234567890-abc
+workflow forge security forge-1234567890-abc
 
 # Check overall workflow status
-workflow:status
+workflow status
 ```
 
 ## Complete Workflow Tutorial
@@ -152,10 +266,10 @@ workflow:status
 ```bash
 # Initialize project
 mkdir task-app && cd task-app
-workflow:init
+workflow init
 
 # Start PRD creation
-workflow:prd
+workflow prd
 ```
 
 The BMAD PM agent guides you through a structured 12-step dialogue:
@@ -178,7 +292,7 @@ Output: `docs/prd.md` with YAML frontmatter and comprehensive requirements.
 
 ```bash
 # Initialize AO project
-workflow:ao init --auto
+workflow ao init --auto
 
 # This creates agent-orchestrator.yaml with:
 # - Project configuration
@@ -501,52 +615,182 @@ jobs:
       - name: Setup OpenClaw
         run: |
           ./install.sh
-          workflow:ao init --auto
+          workflow ao init --auto
 
       - name: Spawn implementation agent
         run: |
-          workflow:ao spawn my-project ${{ github.event.issue.number }}
+          workflow ao spawn my-project ${{ github.event.issue.number }}
 ```
 
 ## Troubleshooting
+
+### Critical: Root User Issues
+
+**Problem:** Claude Code refuses to run as root with error:
+```
+Claude Code cannot run as root
+Claude Code is designed to be run by humans, not root accounts.
+```
+
+**Solution - Create and use a non-root user:**
+
+```bash
+# Option 1: Create new user (Ubuntu/Debian)
+sudo useradd -m -s /bin/bash openclaw
+sudo usermod -aG sudo openclaw
+sudo passwd openclaw  # set password
+su - openclaw
+
+# Option 2: Use existing user
+# Just switch to your normal user
+su - yourusername
+
+# Option 3: Docker container (for isolated environments)
+docker run -it --name openclaw \
+  -v $(pwd):/workspace \
+  -u 1000:1000 \
+  node:22-bookworm bash
+
+# Then inside container:
+cd /workspace
+git clone --recursive https://github.com/openclaw-collab/openclaw-workflow.git
+./install.sh
+```
+
+**VPS Setup Script:**
+```bash
+#!/bin/bash
+# setup-openclaw-vps.sh - Run as root first
+
+# Create openclaw user
+useradd -m -s /bin/bash openclaw
+
+# Install Node.js for the user
+su - openclaw -c "curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.0/install.sh | bash"
+su - openclaw -c "export NVM_DIR=\"\$HOME/.nvm\" && [ -s \"\$NVM_DIR/nvm.sh\" ] && \. \"\$NVM_DIR/nvm.sh\" && nvm install 22"
+
+# Install Python
+apt-get update && apt-get install -y python3.11 python3.11-pip git
+
+# Clone and setup
+su - openclaw -c "cd ~ && git clone --recursive https://github.com/openclaw-collab/openclaw-workflow.git"
+su - openclaw -c "cd ~/openclaw-workflow && ./install.sh"
+
+echo "Setup complete. Switch to openclaw user: su - openclaw"
+```
 
 ### Installation Issues
 
 ```bash
 # Verify all components
-workflow:doctor
+workflow doctor
+
+# Check what failed
+workflow doctor --json
 
 # Update submodules
-git submodule update --remote
+git submodule update --remote --force
 
-# Reinstall
+# Clean reinstall
+rm -rf packages/*/node_modules
+rm -rf packages/openclaw-cli/node_modules
 ./install.sh
+
+# If AO fails to build (web component errors), this is normal
+# The CLI will still work - check: which ao
+```
+
+### Permission Denied Errors
+
+```bash
+# Ensure PATH includes ~/.local/bin
+export PATH="$HOME/.local/bin:$PATH"
+
+# Check permissions
+ls -la ~/.local/bin/workflow
+ls -la ~/.local/bin/ao
+
+# Fix if needed
+chmod +x ~/.local/bin/workflow
+chmod +x ~/.local/bin/ao
+
+# Re-link if needed
+./install.sh
+```
+
+### Claude Code Not Found
+
+```bash
+# Install Claude Code (requires non-root)
+npm install -g @anthropic-ai/claude-code
+
+# Verify
+claude --version
+
+# If npm global fails, use npx
+npx @anthropic-ai/claude-code
 ```
 
 ### Connection Issues
 
 ```bash
 # Check AO status
-workflow:ao status
+workflow ao status
 
 # View session logs
-workflow:ao session logs <session-id>
+workflow ao session logs <session-id>
 
 # Kill stuck session
-workflow:ao session kill <session-id>
+workflow ao session kill <session-id>
+
+# Reset AO config
+rm agent-orchestrator.yaml
+workflow ao init --auto
 ```
 
 ### FORGE State Issues
 
 ```bash
 # Check FORGE status
-workflow:status
+workflow status
 
 # View active workflow
 cat .claude/forge/active-workflow.md
 
 # Resume workflow
 /forge:continue
+
+# If FORGE plugin not loaded in Claude Code:
+# 1. Check symlink exists:
+ls -la ~/.claude/plugins/forge-ao
+
+# 2. If missing, recreate:
+ln -sf /path/to/openclaw-workflow/packages/forge-ao ~/.claude/plugins/forge-ao
+
+# 3. Restart Claude Code
+```
+
+### Agent/VPS Mode Issues
+
+**Headless operation (no TTY):**
+```bash
+# Use --non-interactive or -y flag
+workflow init my-project --non-interactive
+workflow prd --json -y
+
+# Set environment variable
+export OPENCLAW_NON_INTERACTIVE=true
+export OPENCLAW_JSON_OUTPUT=true
+```
+
+**PRD creation without interaction:**
+```bash
+# Method 1: Environment variable
+export OPENCLAW_PRD_CONTENT="Build a task management app with React and Node.js"
+workflow prd --json --non-interactive
+
+# Method 2: Direct content
+workflow prd "Build a task management app" --json -y
 ```
 
 ## Contributing
